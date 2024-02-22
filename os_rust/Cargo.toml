@@ -1,0 +1,8 @@
+[package]
+name = "os_rust"
+version = "0.1.0"
+edition = "2021"
+authors = ["Gabriel Todt <gabrielrtodt@gmail.com>"]
+
+[dependencies]
+bootloader = "0.9"
