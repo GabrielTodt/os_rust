@@ -25,8 +25,62 @@ pub enum Color {
 pub struct ColorCode(u8);
 impl ColorCode {
     fn new(foreground: Color, background: Color) -> ColorCode{
-        ColorCode((foreground as u8 ) << 4 | (background as u8))//shifts the foreground color 4 bits to the
-                                                                //left then do a 'or' operation betwen the 
-                                                                //foreground and the background.
+        ColorCode((foreground as u8 ) << 4 | (background as u8))
+        // Shifts the foreground color 4 bits to the left, then performs an 'or' operation between the
+        // foreground and the background.
+        // 0000xxxx = foreground
+        // 0000yyyy = background
+        // foreground << 4 = xxxx0000
+        // foreground | background 
+        // xxxx0000
+        // 0000yyyy
+        // xxxxyyyy
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
+struct ScreenChar{
+    ascii_code: u8, //Char Ascii code.
+    color_code: ColorCode, // background/foreground color.
+}
+
+//VGA table consts
+const BUFFER_HEIGHT: usize = 25;
+const BUFFER_WIDTH: usize = 80;
+
+#[repr(transparent)]
+struct Buffer{
+    chars:[[ScreenChar; BUFFER_WIDTH]; BUFFER_HEIGHT]
+}
+
+pub struct Writer{
+    column_position: usize,
+    color_code: ColorCode,
+    buffer: &'static mut Buffer,
+}
+
+impl Writer {
+    fn write_byte(&mut self, byte: u8){
+        match byte {
+            b'\n' => {
+                self.new_line();
+            }
+            byte => {
+                if self.column_position >= BUFFER_WIDTH{
+                    self.new_line();
+                }
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+                let color_code = self.color_code;
+                self.buffer.chars[row][col] = ScreenChar{
+                    ascii_code: byte,
+                    color_code,
+                }
+            }
+        }
+    }
+    fn new_line(&mut self){
+        todo!()
     }
 }
