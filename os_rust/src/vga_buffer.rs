@@ -25,8 +25,8 @@ pub enum Color {
 #[repr(transparent)]
 pub struct ColorCode(u8);
 impl ColorCode {
-    fn new(foreground: Color, background: Color) -> ColorCode{
-        ColorCode((foreground as u8 ) << 4 | (background as u8))
+    const fn new(foreground: Color, background: Color) -> ColorCode{
+        ColorCode((background as u8 ) << 4 | (foreground as u8))
         // Shifts the foreground color 4 bits to the left, then performs an 'or' operation between the
         // foreground and the background.
         // 0000xxxx = foreground
@@ -54,13 +54,14 @@ const BUFFER_WIDTH: usize = 80;
 struct Buffer{
     chars:[[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT]
 }
-
+#[allow(dead_code)]
 pub struct Writer{
     column_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
 }
 
+#[allow(dead_code)]
 impl Writer {
     fn write_byte(&mut self, byte: u8){
         match byte {
@@ -83,7 +84,7 @@ impl Writer {
     fn write_string(&mut self, str: &str){
         for byte in str.bytes(){
             match byte {
-                0x20..=0x7e => {
+                0x20..=0x7e | b'\n'=> {
                     self.write_byte(byte)
                 }
                 _ => {
@@ -92,20 +93,47 @@ impl Writer {
             }
         }
     }
+
     fn new_line(&mut self){
-        
+        for row in 1..BUFFER_HEIGHT{
+            for col in 0..BUFFER_WIDTH{
+                let character = self.buffer.chars[row][col].read();
+                self.buffer.chars[row-1][col].write(character);
+            }
+        }
+        self.clear_row(BUFFER_HEIGHT - 1);
+        self.column_position = 0;
+    }
+
+    fn clear_row(&mut self, row: usize){
+        let blank = ScreenChar{
+            ascii_code: b' ',
+            color_code: self.color_code
+        };
+        for col in 0..BUFFER_WIDTH{
+            self.buffer.chars[row][col].write(blank);
+        }
     }
 }
 
-pub fn print_test(){
-    let mut writer = Writer{
-        column_position: 0,
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer)},
-    };
-
-    //writer.write_byte(b'a');
-   writer.write_string("ello");
-   writer.write_string("World!");
+#[allow(dead_code)]
+use core::fmt;
+impl fmt::Write for Writer{
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_str(s);
+        Ok(())
+    }
 }
+
+use lazy_static::lazy_static;
+use spin::Mutex;
+
+lazy_static!{
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer{ 
+        column_position: 0,
+        color_code: ColorCode::new(Color::Yellow, Color::Black), 
+        buffer: unsafe { &mut *(0xb8000 as *mut Buffer)},
+    });
+}
+
 
